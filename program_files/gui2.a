@@ -1,0 +1,124 @@
+#set file_name [tk_getOpenFile]
+#bind $t <Key> {%W mark set insert end}
+#puts $file_name
+package require Tk
+set file_name ""
+#Proc to open file
+set pwd1 [pwd]
+proc compile {} {
+	global file_name
+	if {$file_name == ""} {
+		tk_messageBox -icon error -title "No file selected" -type ok -message "Open a file to compile"
+	} else {
+		set pwd1 [pwd]
+                regsub {/my_files/(.*)$} $file_name {/program_files/print_bkp.tk} source_file_name
+		source $source_file_name
+		main $file_name
+		tk_messageBox -icon info -title "Compilation Successful" -type ok -message "Successful compilation"
+	}
+}
+
+proc run {} {
+	global file_name
+        regsub {/my_files/(.*)$} $file_name {/program_files/output.a} source_file_name
+	if {[file isfile $source_file_name] == 0} {
+		tk_messageBox -icon error -title "Compilation not done" -type ok -message "Please compile first"
+	} else {
+                regsub {/my_files/(.*)$} $file_name {/program_files/output.a} source_file_name
+                regsub {/my_files/(.*)$} $file_name {/program_files/output1.a} op_file_name
+		exec wish -encoding utf-8 $source_file_name 
+	}
+}
+#Proc to save file
+proc save_file {} {
+	global file_name
+	if {[winfo exists .t] == 0 } {
+		tk_messageBox -icon error -title "Text window not found" -type ok -message "Please open a new or existing file"
+		return
+ 	}
+	set file_name [tk_getSaveFile -defaultextension a]
+	if {$file_name != ""} {
+		set file1 [open $file_name w]
+		fconfigure $file1 -encoding utf-8
+		set a [.t get 1.0 end]
+		puts $file1 $a
+		close $file1
+	}
+}
+
+
+#Proc to open new file
+proc new_file {} {
+   
+   if {[winfo exists .t]} {
+      set answer [tk_messageBox -icon question -title "Save existing file???" -type yesnocancel -message "Do you want to save existing file?"]
+      switch -- $answer {
+         yes {
+                save_file
+               destroy .t
+         }
+         no {destroy .t}
+         cancel {return}
+      }
+   }
+   destroy .f
+   global res_win
+   set res_win [text .t -width 1000 -height 290]
+   pack .t -expand 0 -side top 
+}
+proc open_file {} {
+	global file_name
+	set types {
+		{{A Language Files} {.a}}
+		{{All Files} *}
+	}
+	set file_name [tk_getOpenFile -filetypes $types ]
+	if {$file_name != ""} {
+		set file1 [open $file_name r]
+		fconfigure $file1 -encoding utf-8
+		set line_no 0
+		new_file 	
+		while {[gets $file1 line]>=0} {
+			.t insert end ${line}\n
+		}
+		.t delete end
+		.t delete end
+		.t delete end
+		close $file1
+	}
+}
+
+
+
+wm title . "3-T" 
+#wm resizable . 0 0
+frame .f -width 1000 -height 490
+pack .f
+#set file_name "Click on open button to open file here"
+menu .menu
+. configure -menu .menu
+
+menu .menu.file1
+.menu add cascade -menu .menu.file1 -label File
+.menu.file1 add command -label New -command {new_file} 
+.menu.file1 add command -label Open -command {open_file} 
+.menu.file1 add command -label Save -command {save_file} 
+
+menu .menu.execute
+.menu add cascade -menu .menu.execute -label Execute
+.menu.execute add command -label Compile -command {compile}
+.menu.execute add command -label Run -command {run}
+
+menu .menu.help
+.menu add cascade -menu .f.menu.help -label Help
+set result [frame .result -width 1000 -height 6 ]
+#.result configure -state disabled
+pack .result -side bottom 
+label .result.res_label -text "Result" -font {{Times New Roman} 10 bold} -foreground blue
+pack .result.res_label -side top
+text .result.op -width 1000 -height 9
+.result.op configure -state disabled 
+pack .result.op -expand 1 -fill both
+#.f.menu.execute add cascade -menu [list .f.menu.execute.compile .f.menu.execute.run] -label Execute
+#.f.menu.execute.compile add command -label Compile -command {compile} 
+#.f.menu.execute.run add command -label Run -command {run}

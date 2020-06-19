@@ -1,0 +1,542 @@
+#!/usr/bin/tclsh
+
+set ipfile ""
+set line_no 0
+set opfile ""
+# Open the files
+proc open_compilation_file {file_name} {
+	global ipfile line_no opfile
+       regsub {/my_files/(.*)} $file_name {/program_files/output.a} source_file_name	
+set opfile [open $source_file_name  w]
+puts $opfile "#!/usr/bin/tclsh"
+set ipfile [open $file_name r]
+set int_var [list ]
+set char_var [list ]
+
+puts $opfile "
+   proc sub_numbers_to_arabic \{rhs\} \{
+      regsub -all {१} \$rhs {1} rhs
+      regsub -all {२} \$rhs {2} rhs
+      regsub -all {३} \$rhs {3} rhs
+      regsub -all {४} \$rhs {4} rhs
+      regsub -all {५} \$rhs {5} rhs
+      regsub -all {६} \$rhs {6} rhs
+      regsub -all {७} \$rhs {7} rhs
+      regsub -all {८} \$rhs {8} rhs
+      regsub -all {९} \$rhs {9} rhs
+      regsub -all {०} \$rhs {0} rhs
+      return \$rhs
+   \}
+   proc sub_numbers_to_devanagari \{rhs\} \{
+      regsub -all {1} \$rhs {१} rhs
+      regsub -all {2} \$rhs {२} rhs
+      regsub -all {3} \$rhs {३} rhs
+      regsub -all {4} \$rhs {४} rhs
+      regsub -all {5} \$rhs {५} rhs
+      regsub -all {6} \$rhs {६} rhs
+      regsub -all {7} \$rhs {७} rhs
+      regsub -all {8} \$rhs {८} rhs
+      regsub -all {9} \$rhs {९} rhs
+      regsub -all {0} \$rhs {०} rhs
+      return \$rhs
+   \}
+
+   global res_win
+   set res_win \[grid \[text .res_win1\]\]
+   .res_win1 configure -state disabled
+   "
+}
+
+# Proc to substitute devanagari numbers with arabic numerals
+proc sub_numbers {rhs} {
+   regsub -all {१} $rhs {1} rhs
+   regsub -all {२} $rhs {2} rhs
+   regsub -all {३} $rhs {3} rhs
+   regsub -all {४} $rhs {4} rhs
+   regsub -all {५} $rhs {5} rhs
+   regsub -all {६} $rhs {6} rhs
+   regsub -all {७} $rhs {7} rhs
+   regsub -all {८} $rhs {8} rhs
+   regsub -all {९} $rhs {9} rhs
+   regsub -all {०} $rhs {0} rhs
+   return $rhs
+}
+
+# Proc to substitute arabic numbers with devanagari numbers
+proc sub_numbers1 {rhs} {
+   regsub -all {1} $rhs {१} rhs
+   regsub -all {2} $rhs {२} rhs
+   regsub -all {3} $rhs {३} rhs
+   regsub -all {4} $rhs {४} rhs
+   regsub -all {5} $rhs {५} rhs
+   regsub -all {6} $rhs {६} rhs
+   regsub -all {7} $rhs {७} rhs
+   regsub -all {8} $rhs {८} rhs
+   regsub -all {9} $rhs {९} rhs
+   regsub -all {0} $rhs {०} rhs
+   return $rhs
+}
+
+
+# Proc to get string from stdin
+proc get_value_from_stdin {line} {
+   global opfile int_var char_var line_no
+   set line_no1 [sub_numbers1 $line_no]
+   if {[regexp {^\s*नक्ष\s+\{\s*(.*)\s*\}} $line args var] == 1} {
+      if {$var == ""} {
+         # Error: empty arguments
+         puts "$line_no1:??{}??"
+         error "Empty arguments
+      }
+      if {[lsearch -exact $int_var $var] != -1} {
+         puts $opfile "puts \"\""
+         puts $opfile "gets stdin $var"
+         puts $opfile "if \{\[regexp \{\[०१२३४५६७८९\]+\} \${$var} \] == 0\} \{"
+         puts $opfile "   set $var 0"
+         puts $opfile "\} else {"
+         puts $opfile "   set $var \[sub_numbers_to_arabic \${$var}\]"
+         puts $opfile "}"  
+      } elseif {[lsearch -exact $char_var $var] != -1} {
+         puts $opfile "gets stdin \${$var}"               
+      } else { 
+         # Error: Unknown variable
+         puts "$line_no1:??$var??"
+         error "Unknown variable"
+      }
+   } else {
+      #Error : Wrong syntax
+      puts "!X+-"
+      error "Wrong syntax"
+   }
+}
+
+
+# Proc for print command
+proc print {line} {
+   global opfile int_var char_var line_no 
+   set op_line_no 0
+   set line_no1 [sub_numbers1 $line_no]
+   if {[regexp {^\s*लिख\s+(.*)$} $line args a] == 1} {
+      set b [split $a ""]
+      set previous_char ""
+      set previous_print 0
+      for {set i 0} {$i < [string length $a]} {incr i} {
+         if {[regexp {\"} [lindex $b $i]] == 1} {
+            if {$previous_print == 1} {
+               # Error: Missing space
+               puts "$line_no1:?? ??"
+               error "Missing space"
+            }
+            incr i
+            set word ""
+            while { [regexp {\"} [lindex $b $i]] == 0} {
+               if {[regexp {\\} [lindex $b $i]] == 1} {
+                  incr i
+               }
+               set word "$word[lindex $b $i]"
+               incr i
+               if {$i == [string length $a]} {
+                  # Error: Missing Quotes
+                  puts "$line_no1:??\"??" 
+                  error "Missing quotes"
+               }
+            }
+            #puts $opfile "puts -nonewline $word"
+	    puts $opfile ".res_win1 configure -state normal"
+	    puts $opfile ".res_win1 insert end $word"
+	    puts $opfile ".res_win1 configure -state disabled"
+            set previous_print 1
+         } elseif {[regexp {\s} [lindex $b $i]] == 1} {
+            set previous_print 0
+         } elseif {[regexp {\\} [lindex $b $i]] == 1} {
+            # Error: Unknown slash
+            puts "$line_no1:??\\??"
+            error "Unknown slash"
+         } else {
+            set var ""
+            set closed 0
+            while { [regexp {[\s\n]} [lindex $b $i]] != 1} {
+               set var "$var[lindex $b $i]"
+               if {$i == [expr [string length $a]-1]} {
+                  break;
+               } elseif { $i > [string length $a] } {
+                  # Error: Internal Error
+                  error "Error"
+               }
+               incr i
+               if {$i == [string length $a]} {
+                  set var "$var[lindex $b $i]"
+                  break
+               }
+            }
+            if {[lsearch -exact $int_var $var] != -1} {
+               set var1 [sub_numbers1 $var]
+               puts $opfile "puts -nonewline \"\[sub_numbers_to_devanagari \${$var}\]\""
+            } elseif {[lsearch -exact $char_var $var] != -1} {
+               puts $opfile "puts -nonewline \${$var}"               
+            } else { 
+               # Error: Unknown variable
+               puts "$line_no1:??$var??"
+               error "Unknown variable"
+            }  
+         }
+      }
+   }
+#   puts $opfile "puts \"\""
+}
+
+
+# Proc for complex assign
+proc complex_assign {a} {
+   global opfile int_var char_var line_no
+   set line_no1 [sub_numbers1 $line_no]
+   set b [split $a ""]
+   set previous_number 0
+   set previous_operator 0
+   set operator 0
+   set rhs ""
+   for {set i 0} {$i < [string length $a]} {incr i} {
+      if {[regexp {[\d\(\)]} [lindex $b $i]] == 1} {
+         if {$previous_number == 1} {
+            # Error: Missing operator
+            puts "$line_no1:??@??"
+            error "Missing operator"
+         }
+         set number ""
+         while {[regexp {[\d\(\)]} [lindex $b $i]] == 1} {
+             set number "$number[lindex $b $i]"
+             incr i
+             if {$i == [string length $a]} {
+               break
+            }
+         }
+         set i [expr $i-1]
+         set previous_operator 0
+         set rhs "$rhs$number"
+      } elseif {[regexp {[\+\-\*%\/]} [lindex $b $i]] == 1} {
+         if {$previous_operator == 1} {
+            # Error: Additional operator
+            puts "$line_no1:++@++"
+            error "Additional operator"
+         } else {
+            set rhs "$rhs[lindex $b $i]"
+         }
+         set operator 1
+         set previous_number 0
+         set previous_operator 1
+      } elseif {[regexp { } [lindex $b $i]] == 1} {
+      } else {
+         if {$previous_number == 1} {
+            # Error: Missing operator
+            puts "$line_no1:??@??"
+            error "Missing operator"
+         }
+         set var ""
+         while {[regexp {[\s\+\-\*\%\/]} [lindex $b $i]] == 0 } {
+            set var "$var[lindex $b $i]"
+            if {$i == [expr [string length $a]-1]} {
+               break
+            }   
+            incr i
+         }
+         if {[lsearch -exact $int_var $var] == -1} {
+               #Error: Variable not found
+               puts $opfile "??$var??"
+               error "Variable not found
+         }
+         set rhs "$rhs\${$var}"
+         set i [expr $i-1]
+         set previous_operator 0
+         set previous_number 1
+      }
+   }
+   if {$operator == 1} {
+      set rhs "\[expr $rhs\]"
+   }
+   return $rhs
+}
+
+# Proc to assign the value to file
+proc assign {line} {
+   global opfile int_var char_var line_no
+   set line_no1 [sub_numbers1 $line_no]
+   if {[regexp {^\s*(.*)\s*=\s*(.*)\s*$} $line a lhs1 rhs1] == 1} {
+      regsub -all {\s} $rhs1 {} rhs
+      regsub -all {\s} $lhs1 {} lhs
+      if {[lsearch -exact $int_var $lhs] == -1} {
+            #Error: Variable not found
+            puts "??$lhs??"
+            error "Variable not found"
+      }
+      puts  -nonewline $opfile "set ";
+      puts  -nonewline $opfile $lhs;
+      puts  -nonewline $opfile " ";
+      set rhs1 [sub_numbers $rhs]
+      set rhs2 [complex_assign $rhs1]
+      puts -nonewline $opfile "$rhs2"
+   }
+   puts $opfile ""
+}
+
+# Declare integer
+proc declare_int {line} {
+   global int_var opfile
+   if {[regexp {\s*गण\s*(.*)} $line a args] == 1} {
+      set args1 [split $args ","]
+      foreach i $args1 { 
+         regsub {\s*} $i "" i
+         puts $opfile "set ${i} 0"
+         lappend int_var $i
+      }
+   }
+}
+
+# Declare string
+proc declare_char {line} {
+   global char_var opfile
+   if {[regexp {\s*सर\s*(.*)} $line a args] == 1} {
+      set args1 [split $args ","]
+      foreach i $args1 { 
+         regsub {\s*} $i "" i
+         puts $opfile "set ${i} \"\""
+         lappend char_var $i
+      }
+   }
+}
+
+#If statement
+proc if_statement {line} {
+   global opfile int_var char_var line_no
+   set line_no1 [sub_numbers1 $line_no]
+   if {[regexp {^\s*यदि\s*\{\s*(.*)\s*\}\s*\{\s*$} $line full a] == 1} {
+      set expr_val [conditional_expr_eval $a]
+      puts $opfile "if \{ $expr_val \} \{"
+   } else {
+      #Error:Syntax error
+      puts "!X+-"
+      error "Syntax error"
+   }
+}
+
+# Proc to evaluate conditional expression
+proc conditional_expr_eval {a} {
+   global opfile int_var char_var line_no
+   set line_no1 [sub_numbers1 $line_no]
+   if {$a == ""} {
+      #Error:Empty args
+      puts "$line_no1:??{}??"
+      error "Empty args"
+   }
+   set b1 [sub_numbers $a]
+   set b [split $b1 ""]
+   set rel_op 0
+   for {set i 0} {$i < [string length $a]} {incr i} {
+      if {[regexp {[<>=!]} [lindex $b $i]] == 0} {
+         set cond_expr ""
+         while {[regexp {[<>=!]} [lindex $b $i]] == 0} {
+            set cond_expr "$cond_expr[lindex $b $i]"
+            incr i
+            if {$i >= [string length $a]} {
+               if {$rel_op == 0} {
+                  #Error: Missing relational operator
+                  puts "$line_no1:??==??"
+                  error "Missing relational operator"
+               } else {
+                  break;
+               }
+            }
+         }
+         set i [expr $i-1]
+         if {$rel_op == 0} {
+            set lhs $cond_expr
+         } else {
+            set rhs $cond_expr
+         }
+      } else {
+         if {$rel_op == 0} {
+            set op ""
+            set op "[lindex $b $i]"
+            incr i
+            if {[regexp {[<>=!]} [lindex $b $i]] == 1} {
+               set op "$op[lindex $b $i]"
+               set rel_op 1
+            } else {
+               if {$op ==  "="} {
+                  #Error:Wrong syntax
+                  puts "!x+-"
+                  error "Wrong syntax"
+               }
+               set rel_op 1
+               set i [expr $i-1]
+            }
+         } else {
+            #Error:Wrong syntax
+            puts "!x+-"
+            error "Wrong syntax"
+         }
+      }
+   }
+   if {$rhs == ""} {
+      #Error:Wrong syntax
+      puts "$line_no1:!X+-"
+      error "Wrong syntax"
+   }
+   set lhs1 [complex_assign $lhs]
+   set rhs1 [complex_assign $rhs]
+   set expr_val "$lhs1 $op $rhs1"
+   return $expr_val
+}
+
+# proce for elseif
+proc elseif_statement { line } {
+   global opfile int_var char_var line_no
+   set line_no1 [sub_numbers1 $line_no]
+   if {[regexp {^\s*\}\s*उत\s*\{\s*(.*)\s*\}\s*\{$} $line full a] == 1} {
+      set expr_val [conditional_expr_eval $a]
+      puts $opfile "\} elseif \{ $expr_val \} \{"
+   } else {
+      #Error:Syntax error
+      puts "!X+-"
+      error "Syntax error"
+   }
+}
+
+# proc for else
+proc else_statement {line} {
+   global opfile int_var char_var line_no
+   set line_no1 [sub_numbers1 $line_no]
+   if {[regexp {^\s*\}\s*अथ\s*\{\s*$} $line full a] == 1} {
+      puts $opfile "\} else \{"
+   } else {
+      #Error:Syntax error
+      puts "!X+-"
+      error "Syntax error"
+   }
+}
+
+# proc for while
+proc while_statement {line} { 
+   global opfile int_var char_var line_no
+   set line_no1 [sub_numbers1 $line_no]
+   if {[regexp {^\s*यर्हि\s*\{\s*(.*)\s*\}\s*\{\s*$} $line full a] == 1} {
+      set expr_val [conditional_expr_eval $a]
+      puts $opfile "while \{ $expr_val \} \{"
+   } else {
+      #Error:Syntax error
+      puts "!X+-"
+      error "Syntax error"
+   }
+}
+
+# Next state expression
+proc next_state_expr {line} {
+   if {$line == ""} {
+      return $line
+   } elseif {[regexp {^\s*वृद्धि\s*} $line] == 1} {
+      increment $line 
+   } elseif {[regexp {^\s*क्षय\s*} $line] == 1} {
+      decrement $line
+   } else {
+      #Error:Syntax error
+      puts "!X+-"
+      error "Syntax error"
+   }
+}
+      
+# proc for for statement
+proc for_statement {line} {
+   global opfile int_var char_var line_no
+   set line_no1 [sub_numbers1 $line_no]
+   if {[regexp {^\s*अह\s+\(\s*(.*)\s*\)\s+\(\s*(.*)\s*\)\s+\(\s*(.*)\s*\)\s\{$} $line full assign cond next_state] == 1} {
+      set assign1 [assign $assign]
+      set cond1 [conditional_expr_eval $cond]
+      set next1 [
+   }
+      
+}
+# proc for else
+proc flower_brace {line} {
+   global opfile int_var char_var line_no
+   puts $opfile "\}"
+}
+
+# Increment proc
+proc increment {line} {
+   if {[regexp {^\s*वृद्धि\s+(\S+)\s+(\d*)\s*$} $line full var value] == 1} {
+      if {$value == ""} {
+         return "incr $var"
+      } else {
+         set val1 [sub_numbers $value]
+         return "incr $var $val1"
+      }
+   } else {
+      #Error:Syntax error
+      puts "!X+-"
+      error "Syntax error"
+   }
+}
+
+# Decrement proc
+proc decrement {line} {
+   if {[regexp {^\s*क्षय\s+(\S*)\s+(\d*)\s*$} $line full var value] == 1} {
+      if {$value == ""} {
+         return "decr $var"
+      } else {
+         set val1 [sub_numbers $value]
+         return "decr $var $val1"
+      }
+   } else {
+      #Error:Syntax error
+      puts "!X+-"
+      error "Syntax error"
+   }
+}
+
+# First proc, to regexp the command
+proc regexp_dev {line} {
+   global opfile int_var char_var line_no
+   if {[regexp {^\s*लिख\s+(.*)} $line a args] == 1} {
+      print $line
+   } elseif {[regexp {^\s*यदि\s*} $line] == 1} {
+      if_statement $line
+   } elseif {[regexp {^\s*उत\s*} $line] == 1} {
+      elseif_statement $line
+   } elseif {[regexp {^\s*अथ\s*} $line] == 1} {
+      else_statement $line
+   } elseif {[regexp {^\s*यर्हि\s*} $line] == 1} {
+      while_statement $line
+   } elseif {[regexp {^\s*अह\s*} $line] == 1} {
+      for_statement $line
+   } elseif {[regexp {=} $line] == 1} {
+      assign $line
+   } elseif {[regexp {\s*गण\s*} $line] == 1} {
+      declare_int $line
+   } elseif {[regexp {^\s*\}\s*$} $line] == 1} {
+      flower_brace $line
+   } elseif {[regexp {^\s*नक्ष\s*} $line] == 1} {
+      get_value_from_stdin $line
+   } elseif {[regexp {^\s*वृद्धि\s*} $line] == 1} {
+      puts $opfile "[increment $line]" 
+   } elseif {[regexp {^\s*क्षय\s*} $line] == 1} {
+      puts $opfile "[decrement $line]" 
+   }
+}
+
+# Main program
+proc main {file_name} {
+	global ipfile line_no opfile
+   open_compilation_file $file_name
+while {[gets $ipfile line] >= 0} {
+   incr line_no
+   if {[regexp {;} $line] == 1} {
+      set line1 [split $line ";"]
+      foreach line2 $line1 {
+         regexp_dev $line2;   
+      }
+   } else {
+       regexp_dev $line
+   }
+}
+close $opfile
+close $ipfile
+}
