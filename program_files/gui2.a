@@ -1,3 +1,6 @@
+#set file_name [tk_getOpenFile]
+#bind $t <Key> {%W mark set insert end}
+#puts $file_name
 package require Tk
 set file_name ""
 #Proc to open file
@@ -43,7 +46,7 @@ proc save_file {} {
 			set k 1
 			set i1 ${i}.${j}
 			set i2 ${i}.${k}
-			while { $i1 < [.t index $i2] } {
+			while { $i2 == [.t index $i2] } {
 				set b [.t get $i1 $i2];
 				puts -nonewline $file1 $b
 				set j [expr $j+1];
