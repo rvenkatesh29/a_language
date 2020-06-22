@@ -5,6 +5,7 @@ set line_no 0
 set opfile ""
 set int_var [list ]
 set char_var [list ]
+set flower_brace [list ]
 # Open the files
 proc open_compilation_file {file_name} {
 	global ipfile line_no opfile
@@ -158,7 +159,7 @@ proc print {line} {
                error "Missing space"
             }
             incr i
-            set word ""
+            set word "{"
             while { [regexp {\"} [lindex $b $i]] == 0} {
                if {[regexp {\\} [lindex $b $i]] == 1} {
                   incr i
@@ -173,7 +174,7 @@ proc print {line} {
             }
             #puts $opfile "puts -nonewline $word"
 	    puts $opfile ".res_win1 configure -state normal"
-	    puts $opfile ".res_win1 insert end $word"
+	    puts $opfile ".res_win1 insert end $word}"
 	    puts $opfile ".res_win1 configure -state disabled"
             set previous_print 1
          } elseif {[regexp {\s} [lindex $b $i]] == 1} {
@@ -276,7 +277,7 @@ proc complex_assign {a} {
             }   
             incr i
          }
-         if {[lsearch -exact $int_var $var] == -1} {
+         if {[lsearch -exact $int_var $var] == ""} {
                #Error: Variable not found
                puts $opfile "??$var??"
                error "Variable not found
@@ -301,19 +302,28 @@ proc assign {line} {
       regsub -all {\s} $rhs1 {} rhs
       regsub -all {\s} $lhs1 {} lhs
       if {[lsearch -exact $int_var $lhs] == -1} {
-            #Error: Variable not found
-            puts "??$lhs??"
-	    tk_messageBox -icon error -title "Compilation Error" -type ok -message "$line_no1:$lhs:??\\??"
-            error "Variable not found"
+      	    if {[lsearch -exact $char_var $lhs] == -1} {
+               #Error: Variable not found
+               puts "??$lhs??"
+	       tk_messageBox -icon error -title "Compilation Error" -type ok -message "$line_no1:$lhs:??\\??"
+               error "Variable not found"
+            }
       }
-      puts  -nonewline $opfile "set ";
-      puts  -nonewline $opfile $lhs;
-      puts  -nonewline $opfile " ";
       set rhs1 [sub_numbers $rhs]
-      set rhs2 [complex_assign $rhs1]
-      puts -nonewline $opfile "$rhs2"
+      if {[regexp {\+\-\*\/\%\(\)} $rhs1] == 1 } {
+         set rhs1 [complex_assign $rhs1]
+      } 
+   } else {
+      #Error:Wrong syntax
+      puts "!x+-"
+      error "Wrong syntax"
    }
-   puts $opfile ""
+   return "set $lhs $rhs1"
+}
+proc assign1 {line} {
+        global int_var opfile
+	set assign2 [assign $line]
+	puts $opfile $assign2
 }
 
 # Declare integer
@@ -344,9 +354,9 @@ proc declare_char {line} {
 
 #If statement
 proc if_statement {line} {
-   global opfile int_var char_var line_no
+   global opfile int_var char_var line_no flower_brace
    set line_no1 [sub_numbers1 $line_no]
-   if {[regexp {^\s*यदि\s*\(\s*(.*)\s*\)\s*\(\s*$} $line full a] == 1} {
+   if {[regexp {^\s*यदि\s*\{\s*(.*)\s*\}\s*\{\s*$} $line full a] == 1} {
       set expr_val [conditional_expr_eval $a]
       puts $opfile "if \{ $expr_val \} \{"
    } else {
@@ -354,6 +364,7 @@ proc if_statement {line} {
       puts "!X+-"
       error "Syntax error"
    }
+   lappend flower_brace $line_no
 }
 
 # Proc to evaluate conditional expression
@@ -419,17 +430,43 @@ proc conditional_expr_eval {a} {
       puts "$line_no1:!X+-"
       error "Wrong syntax"
    }
-   set lhs1 [complex_assign $lhs]
-   set rhs1 [complex_assign $rhs]
-   set expr_val "$lhs1 $op $rhs1"
+   if {[regexp {\+\-\*\/\%} $lhs] == 1} {
+      set lhs [complex_assign $lhs]
+   } elseif {[regexp {\d+} $lhs] == 1} {
+   } else {
+      regsub -all { } $lhs {} lhs
+      if {[lsearch -exact $int_var $lhs] == -1} {
+                 #Error: Variable not found
+                 puts "??$lhs??"
+                 tk_messageBox -icon error -title "Compilation Error" -type ok -message "$line_no1:$lhs:??\\??"
+                 error "Variable not found"
+      } else {
+	      set lhs \${$lhs}
+      }
+   }
+   if {[regexp {\+\-\*\/\%} $rhs] == 1} {
+      set rhs [complex_assign $rhs]
+   } elseif {[regexp {\d+} $rhs] == 1} {
+   } else {
+      regsub -all { } $rhs {} rhs
+      if {[lsearch -exact $int_var $rhs] == -1} {
+                 #Error: Variable not found
+                 puts "??$rhs??"
+                 tk_messageBox -icon error -title "Compilation Error" -type ok -message "$line_no1:$rhs:??\\??"
+                 error "Variable not found"
+      } else {
+	      set rhs \${$rhs}
+      }
+   }
+   set expr_val "$lhs $op $rhs"
    return $expr_val
 }
 
 # proce for elseif
 proc elseif_statement { line } {
-   global opfile int_var char_var line_no
+   global opfile int_var char_var line_no flower_brace
    set line_no1 [sub_numbers1 $line_no]
-   if {[regexp {^\s*\)\s*उत\s*\(\s*(.*)\s*\)\s*\{$} $line full a] == 1} {
+   if {[regexp {^\s*\}\s*उत\s*\{\s*(.*)\s*\}\s*\{\s*$} $line full a] == 1} {
       set expr_val [conditional_expr_eval $a]
       puts $opfile "\} elseif \{ $expr_val \} \{"
    } else {
@@ -437,26 +474,28 @@ proc elseif_statement { line } {
       puts "!X+-"
       error "Syntax error"
    }
+   lappend flower_brace $line_no
 }
 
 # proc for else
 proc else_statement {line} {
-   global opfile int_var char_var line_no
+   global opfile int_var char_var line_no flower_brace
    set line_no1 [sub_numbers1 $line_no]
-   if {[regexp {^\s*\)\s*अथ\s*\(\s*$} $line full a] == 1} {
+   if {[regexp {^\s*\}\s*अथ\s*\{\s*$} $line full a] == 1} {
       puts $opfile "\} else \{"
    } else {
       #Error:Syntax error
       puts "!X+-"
       error "Syntax error"
    }
+   lappend flower_brace $line_no
 }
 
 # proc for while
 proc while_statement {line} { 
-   global opfile int_var char_var line_no
+   global opfile int_var char_var line_no flower_brace
    set line_no1 [sub_numbers1 $line_no]
-   if {[regexp {^\s*यर्हि\s*\(\s*(.*)\s*\)\s*\(\s*$} $line full a] == 1} {
+   if {[regexp {^\s*यर्हि\s*\{\s*(.*)\s*\}\s*\{\s*$} $line full a] == 1} {
       set expr_val [conditional_expr_eval $a]
       puts $opfile "while \{ $expr_val \} \{"
    } else {
@@ -464,6 +503,8 @@ proc while_statement {line} {
       puts "!X+-"
       error "Syntax error"
    }
+   lappend flower_brace $line_no
+   puts "[llength $flower_brace]" 
 }
 
 # Next state expression
@@ -483,18 +524,19 @@ proc next_state_expr {line} {
       
 # proc for for statement
 proc for_statement {line} {
-   global opfile int_var char_var line_no
+   global opfile int_var char_var line_no flower_brace
    set line_no1 [sub_numbers1 $line_no]
-   if {[regexp {^\s*अह\s+\(\s*(.*)\s*\)\s+\(\s*(.*)\s*\)\s+\(\s*(.*)\s*\)\s\{$} $line full assign cond next_state] == 1} {
+   if {[regexp {^\s*अह\s+\{\s*(.*)\s*\}\s+\{\s*(.*)\s*\}\s+\{\s*(.*)\s*\}\s\{\s*$} $line full assign cond next_state] == 1} {
       if {$assign == ""} {
-         set assign1 ""
+         set assign2 ""
+	 puts  1
       } else {
-         set assign1 [assign [sub_numbers $assign]]
+         set assign2 [assign $assign]
       }
       set cond1 [conditional_expr_eval [sub_numbers $cond]]
-      if {[regexp {^\s*वृद्धि\s+(\S+)\s+(\d*)\s*$} $next_state] == 1} {
+      if {[regexp {^\s*वृद्धि\s+(.*)\s*$} $next_state] == 1} {
          set next1 [increment [sub_numbers $next_state]]
-      } elseif {[regexp {^\s*क्षय\s+(\S*)\s+(\d*)\s*$} $next_state] == 1} {
+      } elseif {[regexp {^\s*क्षय\s+(.*)\s*$} $next_state] == 1} {
          set next1 [decrement [sub_numbers $next_state]]
       } elseif {$next_state == ""} {
          set next1 ""
@@ -503,49 +545,73 @@ proc for_statement {line} {
          puts "$line_no1:!X+-"
          error "Syntax error"
       }
-      puts $opfile "for \{$assign1\} \{$cond1\} \{$next1\} \{"
+      puts $opfile "for \{$assign2\} \{$cond1\} \{$next1\} \{"
    } else {
       #Error:Syntax error
       puts "$line_no1:!X+-"
       error "Syntax error"
    }
+   lappend flower_brace $line_no
       
 }
 # proc for else
-proc flower_brace {line} {
-   global opfile int_var char_var line_no
-   puts $opfile "\}"
+proc flower_braces {line} {
+   global opfile int_var char_var line_no flower_brace
+   puts "[llength $flower_brace]"
+   if {[llength $flower_brace] > 0} {
+      puts $opfile "\}"
+      set flower_brace [lreplace $flower_brace end end]
+   } else {
+      puts "?+\}"
+      error "Extra brace"
+   } 
 }
 
 # Increment proc
 proc increment {line} {
-   if {[regexp {^\s*वृद्धि\s+(\S+)\s+(\d*)\s*$} $line full var value] == 1} {
-      if {$value == ""} {
-         return "incr $var"
-      } else {
-         set val1 [sub_numbers $value]
-         return "incr $var $val1"
+   global opfile int_var char_var line_no
+   set line_no1 [sub_numbers1 $line_no]
+   if {[regexp {^\s*वृद्धि\s+(.*)\s*$} $line full var ] == 1} {
+      set value [split $var " "]
+      set var [lindex $value 0]
+      set val [lindex $value 1]
+      regsub -all {\s*} $var {} var
+      regsub -all {\s*} $val {} val
+      if {[lsearch -exact $int_var $var] != -1} {
+         if {$val == ""} {
+		 return "incr $var"
+	 } elseif {[regexp {\d*} $val] == 1} {
+		 return "incr $var $val"
+	 } else {
+                 #Error:Syntax error
+                 puts "$line_no1:!X+-"
+                 error "Syntax error"
+	 }
       }
-   } else {
-      #Error:Syntax error
-      puts "!X+-"
-      error "Syntax error"
    }
 }
 
 # Decrement proc
 proc decrement {line} {
-   if {[regexp {^\s*क्षय\s+(\S*)\s+(\d*)\s*$} $line full var value] == 1} {
-      if {$value == ""} {
-         return "decr $var"
-      } else {
-         set val1 [sub_numbers $value]
-         return "decr $var $val1"
+   global opfile int_var char_var line_no
+   set line_no1 [sub_numbers1 $line_no]
+   if {[regexp {^\s*क्षय\s+(.*)\s*$} $line full var ] == 1} {
+      set value [split $var " "]
+      set var [lindex $value 0]
+      set val [lindex $value 1]
+      regsub -all {\s*} $var {} var
+      regsub -all {\s*} $val {} val
+      if {[lsearch -exact $int_var $var] != -1} {
+         if {$val == ""} {
+		 return "incr $var -1"
+	 } elseif {[regexp {\d*} $val] == 1} {
+		 return "incr $var -$val"
+	 } else {
+                 #Error:Syntax error
+                 puts "$line_no1:!X+-"
+                 error "Syntax error"
+	 }
       }
-   } else {
-      #Error:Syntax error
-      puts "!X+-"
-      error "Syntax error"
    }
 }
 
@@ -610,16 +676,16 @@ proc regexp_dev {line} {
       print $line
    } elseif {[regexp {^\s*यदि\s*} $line] == 1} {
       if_statement $line
-   } elseif {[regexp {^\s*उत\s*} $line] == 1} {
+   } elseif {[regexp {^\s*\}\s*उत\s*} $line] == 1} {
       elseif_statement $line
-   } elseif {[regexp {^\s*अथ\s*} $line] == 1} {
+   } elseif {[regexp {^\s*\}\s*अथ\s*} $line] == 1} {
       else_statement $line
    } elseif {[regexp {^\s*यर्हि\s*} $line] == 1} {
       while_statement $line
    } elseif {[regexp {^\s*अह\s*} $line] == 1} {
       for_statement $line
    } elseif {[regexp {=} $line] == 1} {
-      assign $line
+      assign1 $line
    } elseif {[regexp {\s*सूचि\s*} $line] == 1} {
       list_statement $line
    } elseif {[regexp {^\s*गण\s*} $line] == 1} {
@@ -627,7 +693,7 @@ proc regexp_dev {line} {
    } elseif {[regexp {\s*सर\s*} $line] == 1} {
       declare_char $line
    } elseif {[regexp {^\s*\}\s*$} $line] == 1} {
-      flower_brace $line
+      flower_braces $line
    } elseif {[regexp {^\s*नक्ष\s*} $line] == 1} {
       get_value_from_stdin $line
    } elseif {[regexp {^\s*वृद्धि\s*} $line] == 1} {
@@ -636,24 +702,29 @@ proc regexp_dev {line} {
       puts $opfile "[decrement $line]" 
    } elseif {[regexp {^\s*कर\s*} $line] == 1} {
       procedure $line
+   } else {
+      error "Unknown error"
    } 
 }
 
 # Main program
 proc main {file_name} {
-	global ipfile line_no opfile
+   global ipfile line_no opfile flower_brace
    open_compilation_file $file_name
    while {[gets $ipfile line] >= 0} {
-   incr line_no
-   if {[regexp {;$} $line] == 1} {
-      set line1 [split $line ";"]
-      foreach line2 $line1 {
-         regexp_dev $line2;   
+      incr line_no
+      if {[regexp {;$} $line] == 1} {
+         set line1 [split $line ";"]
+         foreach line2 $line1 {
+            regexp_dev $line2;   
+         }
+      } else {
+          regexp_dev $line
       }
-   } else {
-       regexp_dev $line
    }
-}
-close $opfile
-close $ipfile
+   close $opfile
+   close $ipfile
+   if {[llength $flower_brace] != 0} {
+      error "Missing braces"
+   }
 }
