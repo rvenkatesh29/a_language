@@ -1,6 +1,3 @@
-#set file_name [tk_getOpenFile]
-#bind $t <Key> {%W mark set insert end}
-#puts $file_name
 package require Tk
 set file_name ""
 #Proc to open file
@@ -37,12 +34,50 @@ proc save_file {} {
 		return
  	}
 	set file_name [tk_getSaveFile -defaultextension a]
-	if {$file_name != ""} {
+	if { $file_name != "" } {
 		set file1 [open $file_name w]
 		fconfigure $file1 -encoding utf-8
-		set a [.t get 1.0 end]
-		puts $file1 $a
+		set i 1;
+		while {$i < [.t index end]} {
+			set j 0;
+			set k 1
+			set i1 ${i}.${j}
+			set i2 ${i}.${k}
+			while { $i1 < [.t index $i2] } {
+				set b [.t get $i1 $i2];
+				puts -nonewline $file1 $b
+				set j [expr $j+1];
+				set k [expr $k+1];
+				set i1 ${i}.${j}
+				set i2 ${i}.${k}
+			}
+			set i [expr $i+1];
+			puts $file1 "\n"
+		}
 		close $file1
+		set file1 [open $file_name r]
+		set file2 [open ${file_name}_temp w]
+		fconfigure $file1 -encoding utf-8
+		fconfigure $file2 -encoding utf-8
+		while {[gets $file1 line]>=0} {
+			if {[regexp {^\s*$} $line] == 1} {
+			} else {
+				regsub -all {^M} $line {} line1
+				puts $file2 $line1
+			}
+		}		
+		close $file1
+		close $file2
+		set file1 [open $file_name w]
+		set file2 [open ${file_name}_temp r]
+		fconfigure $file1 -encoding utf-8
+		fconfigure $file2 -encoding utf-8
+		while {[gets $file2 line]>=0} {
+			puts $file1 $line
+		}		
+		close $file1
+		close $file2
+		file delete ${file_name}_temp
 	}
 }
 
@@ -81,9 +116,6 @@ proc open_file {} {
 		while {[gets $file1 line]>=0} {
 			.t insert end ${line}\n
 		}
-		.t delete end
-		.t delete end
-		.t delete end
 		close $file1
 	}
 }
