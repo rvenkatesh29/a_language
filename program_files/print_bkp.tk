@@ -6,6 +6,7 @@ set opfile ""
 set int_var [list ]
 set char_var [list ]
 set flower_brace [list ]
+set fuction_list [list ]
 # Open the files
 proc open_compilation_file {file_name} {
 	global ipfile line_no opfile
@@ -19,29 +20,29 @@ set line_no 0
 set function_list [list ]
 puts $opfile "
 proc sub_numbers_to_arabic \{rhs\} \{
-   regsub -all {१} \$rhs {1} rhs
-   regsub -all {२} \$rhs {2} rhs
-   regsub -all {३} \$rhs {3} rhs
-   regsub -all {४} \$rhs {4} rhs
-   regsub -all {५} \$rhs {5} rhs
-   regsub -all {६} \$rhs {6} rhs
-   regsub -all {७} \$rhs {7} rhs
-   regsub -all {८} \$rhs {8} rhs
-   regsub -all {९} \$rhs {9} rhs
-   regsub -all {०} \$rhs {0} rhs
+   regsub -all \{१\} \$rhs \{1\} rhs
+   regsub -all \{२\} \$rhs \{2\} rhs
+   regsub -all \{३\} \$rhs \{3\} rhs
+   regsub -all \{४\} \$rhs \{4\} rhs
+   regsub -all \{५\} \$rhs \{5\} rhs
+   regsub -all \{६\} \$rhs \{6\} rhs
+   regsub -all \{७\} \$rhs \{7\} rhs
+   regsub -all \{८\} \$rhs \{8\} rhs
+   regsub -all \{९\} \$rhs \{9\} rhs
+   regsub -all \{०\} \$rhs \{0\} rhs
    return \$rhs
 \}
 proc sub_numbers_to_devanagari \{rhs\} \{
-   regsub -all {1} \$rhs {१} rhs
-   regsub -all {2} \$rhs {२} rhs
-   regsub -all {3} \$rhs {३} rhs
-   regsub -all {4} \$rhs {४} rhs
-   regsub -all {5} \$rhs {५} rhs
-   regsub -all {6} \$rhs {६} rhs
-   regsub -all {7} \$rhs {७} rhs
-   regsub -all {8} \$rhs {८} rhs
-   regsub -all {9} \$rhs {९} rhs
-   regsub -all {0} \$rhs {०} rhs
+   regsub -all \{1\} \$rhs \{१\} rhs
+   regsub -all \{2\} \$rhs \{२\} rhs
+   regsub -all \{3\} \$rhs \{३\} rhs
+   regsub -all \{4\} \$rhs \{४\} rhs
+   regsub -all \{5\} \$rhs \{५\} rhs
+   regsub -all \{6\} \$rhs \{६\} rhs
+   regsub -all \{7\} \$rhs \{७\} rhs
+   regsub -all \{8\} \$rhs \{८\} rhs
+   regsub -all \{9\} \$rhs \{९\} rhs
+   regsub -all \{0\} \$rhs \{०\} rhs
    return \$rhs
 \}
 
@@ -336,6 +337,10 @@ proc declare_int {line} {
          puts $opfile "set ${i} 0"
          lappend int_var $i
       }
+   } else {
+      #Error:Wrong syntax
+      puts "!x+-"
+      error "Wrong syntax"
    }
 }
 
@@ -349,6 +354,10 @@ proc declare_char {line} {
          puts $opfile "set ${i} \"\""
          lappend char_var $i
       }
+   } else {
+      #Error:Wrong syntax
+      puts "!x+-"
+      error "Wrong syntax"
    }
 }
 
@@ -503,8 +512,7 @@ proc while_statement {line} {
       puts "!X+-"
       error "Syntax error"
    }
-   lappend flower_brace $line_no
-   puts "[llength $flower_brace]" 
+      lappend flower_brace $line_no
 }
 
 # Next state expression
@@ -557,8 +565,7 @@ proc for_statement {line} {
 # proc for else
 proc flower_braces {line} {
    global opfile int_var char_var line_no flower_brace
-   puts "[llength $flower_brace]"
-   if {[llength $flower_brace] > 0} {
+   if {[llength $flower_brace] > 1} {
       puts $opfile "\}"
       set flower_brace [lreplace $flower_brace end end]
    } else {
@@ -617,43 +624,61 @@ proc decrement {line} {
 
 #For procedures
 proc procedure {line} {
-   global opfile int_var char_var line_no
+   global opfile int_var char_var line_no flower_brace
    set line_no1 [sub_numbers1 $line_no]
+   if {[llength $flower_brace] > 1} {
+      #Error:Missing braces
+      puts "$line_no1:?-\}"
+      error "Missing braces"
+   }
    set int_var [list ]
    set char_var [list ]
-   if {[regexp {^\s*कर\s+\(\s*(.*)\s*\)\s*\(\s*$} $line full name var] == 1} {
+   if {[regexp {^\s*कर\s+(.*)\s+\{\s*(.*)\s*\}\s*\{\s*$} $line full name var] == 1} {
       regsub -all {\s} $var {} var
       regsub -all {\s} $name {} name
-      set split_val [split $var ","]
-      foreach i $split_val {
-         regexp_dev $i
+      if {[regexp {^\s*गण\s*} $var] == 1} {
+         declare_int $var
+      } elseif {[regexp {\s*सर\s*} $var] == 1} {
+         declare_char $var
+      } elseif {$var == "" } {
+      } else {
+         #Error:Syntax error
+         puts "$line_no1:!X+-"
+         error "Syntax error"
       }
+      puts $opfile "proc $name \{$var\} \{"
       lappend function_list $name
+      lappend flower_brace $line_no1
    } else {
       #Error:Syntax error
-      puts "!X+-"
+      puts "$line_no1:!X+-"
       error "Syntax error"
    }
 }
 
-
-#For list statements
-proc list_statement {line} {
+proc function_call {line} {
    global opfile int_var char_var line_no
    set line_no1 [sub_numbers1 $line_no]
-   if {[regexp {^\s*सूचि\s+गण\s+(.*)\s*$} $line full var] == 1} {
-      regsub -all {\s} $var {} var
-      lappend int_list [split $var ","]
-   } elseif {[regexp {^\s*सूचि\s+सर\s+(.*)\s*$} $line full var] == 1} {
-      regsub -all {\s} $var {} var
-      lappend char_list [split $var ","]
-   } else {
-      #Error:Syntax error
-      puts "!X+-"
-      error "Syntax error"
-   }
+   puts $opfile $line
 }
 
+##For list statements
+#proc list_statement {line} {
+#   global opfile int_var char_var line_no
+#   set line_no1 [sub_numbers1 $line_no]
+#   if {[regexp {^\s*सूचि\s+गण\s+(.*)\s*$} $line full var] == 1} {
+#      regsub -all {\s} $var {} var
+#      lappend int_list [split $var ","]
+#   } elseif {[regexp {^\s*सूचि\s+सर\s+(.*)\s*$} $line full var] == 1} {
+#      regsub -all {\s} $var {} var
+#      lappend char_list [split $var ","]
+#   } else {
+#      #Error:Syntax error
+#      puts "!X+-"
+#      error "Syntax error"
+#   }
+#}
+#
 # Proc for return
 proc return_statement {} {
    if {[regexp {^\s*लिख\s+(.*)} $line a args] == 1} {
@@ -671,7 +696,7 @@ proc return_statement {} {
       
 # First proc, to regexp the command
 proc regexp_dev {line} {
-   global opfile int_var char_var line_no
+   global opfile int_var char_var line_no fuction_list
    if {[regexp {^\s*लिख\s+(.*)} $line a args] == 1} {
       print $line
    } elseif {[regexp {^\s*यदि\s*} $line] == 1} {
@@ -703,13 +728,15 @@ proc regexp_dev {line} {
    } elseif {[regexp {^\s*कर\s*} $line] == 1} {
       procedure $line
    } else {
-      error "Unknown error"
+      function_call $line
+
    } 
 }
 
 # Main program
 proc main {file_name} {
    global ipfile line_no opfile flower_brace
+   set flower_brace {0}
    open_compilation_file $file_name
    while {[gets $ipfile line] >= 0} {
       incr line_no
@@ -724,7 +751,7 @@ proc main {file_name} {
    }
    close $opfile
    close $ipfile
-   if {[llength $flower_brace] != 0} {
+   if {[llength $flower_brace] > 1} {
       error "Missing braces"
    }
 }
