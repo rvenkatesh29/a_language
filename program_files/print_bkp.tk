@@ -7,6 +7,7 @@ set int_var [list ]
 set char_var [list ]
 set flower_brace [list ]
 set fuction_list [list ]
+set fuction_name [list ]
 # Open the files
 proc open_compilation_file {file_name} {
 	global ipfile line_no opfile
@@ -229,6 +230,7 @@ proc print {line} {
 proc complex_assign {a} {
    global opfile int_var char_var line_no
    set line_no1 [sub_numbers1 $line_no]
+   tk_messageBox -icon error -title "Compilation Error" -type ok -message "$line_no1:??$a??"
    set b [split $a ""]
    set previous_number 0
    set previous_operator 0
@@ -311,7 +313,10 @@ proc assign {line} {
             }
       }
       set rhs1 [sub_numbers $rhs]
-      if {[regexp {\+\-\*\/\%\(\)} $rhs1] == 1 } {
+	 tk_messageBox -icon error -title "Compilation Error" -type ok -message "$line_no1:$rhs1:??\\??"
+	 puts "[regexp {[\+\-\*\/\%\(\)]} $rhs1] $rhs1" 
+      if {[regexp {[\+\-\*\/\%\(\)]} $rhs1] == 1 } {
+	 tk_messageBox -icon error -title "Compilation Error" -type ok -message "$line_no1:$rhs1:??\\??"
          set rhs1 [complex_assign $rhs1]
       } 
    } else {
@@ -334,6 +339,11 @@ proc declare_int {line} {
       set args1 [split $args ","]
       foreach i $args1 { 
          regsub -all {\s*} $i "" i
+	 if {[lsearch $i $int_var] != -1} {
+            #Error:Duplicate instantiation
+	    puts "++$i"
+	    error "Duplicate instantiation"
+         }
          puts $opfile "set ${i} 0"
          lappend int_var $i
       }
@@ -349,8 +359,13 @@ proc declare_char {line} {
    global char_var opfile
    if {[regexp {\s*सर\s*(.*)} $line a args] == 1} {
       set args1 [split $args ","]
-      foreach i $args1 { 
+      foreach i $args1 {
          regsub -all {\s*} $i "" i
+	 if {[lsearch $i $char_var] != -1} {
+            #Error:Duplicate instantiation
+	    puts "++$i"
+	    error "Duplicate instantiation"
+         }
          puts $opfile "set ${i} \"\""
          lappend char_var $i
       }
@@ -624,7 +639,7 @@ proc decrement {line} {
 
 #For procedures
 proc procedure {line} {
-   global opfile int_var char_var line_no flower_brace
+   global opfile int_var char_var line_no flower_brace function_name function_list
    set line_no1 [sub_numbers1 $line_no]
    if {[llength $flower_brace] > 1} {
       #Error:Missing braces
@@ -633,21 +648,36 @@ proc procedure {line} {
    }
    set int_var [list ]
    set char_var [list ]
-   if {[regexp {^\s*कर\s+(.*)\s+\{\s*(.*)\s*\}\s*\{\s*$} $line full name var] == 1} {
-      regsub -all {\s} $var {} var
+   if {[regexp {^\s*कर\s+\{\s*(.*)\s*\}\s+(.*)\s+\{\s*(.*)\s*\}\s*\{\s*$} $line full ret_value name var] == 1} {
       regsub -all {\s} $name {} name
+      regsub -all {\s} $ret_value {} ret_value
+      if {[regexp {हीन} $ret_value] == 1} {
+         set ret_value1 void
+      } elseif {[regexp {सर} $ret_value] == 1} {
+         set ret_value1 str
+      } elseif {[regexp {गण} $ret_value] == 1} {
+         set ret_value1 int
+      } else {
+         #Error: Invalid return value
+	 puts "$line_no1:X->$name"
+	 error "Invalid return value"
+      }
       if {[regexp {^\s*गण\s*} $var] == 1} {
          declare_int $var
+         set ret_value int
       } elseif {[regexp {\s*सर\s*} $var] == 1} {
          declare_char $var
+	 set arg_type str
       } elseif {$var == "" } {
+	 set arg_type void
       } else {
          #Error:Syntax error
-         puts "$line_no1:!X+-"
-         error "Syntax error"
+         puts "$line_no1:!X+-\{\}"
+         error "Syntax error in arg type"
       }
       puts $opfile "proc $name \{$var\} \{"
-      lappend function_list $name
+      lappend function_name $name
+      lappend function_list {$name $arg_type $ret_value1}
       lappend flower_brace $line_no1
    } else {
       #Error:Syntax error
@@ -656,10 +686,50 @@ proc procedure {line} {
    }
 }
 
+proc function_call1 {line} {
+   set fn_c [function_call $line]
+   puts $opfile $fn_c
+}
 proc function_call {line} {
-   global opfile int_var char_var line_no
+   global opfile int_var char_var line_no function_name function_list fn_list_index
    set line_no1 [sub_numbers1 $line_no]
-   puts $opfile $line
+   if  {[regexp {^\s*(.*)\s+(.*)\s*} $line full name args] == 1} {
+      regsub {\s} $name {} name
+      regsub {\s} $args {} args
+   } elseif {[regexp {^\s*(.*)\s*} $line full name ] == 1} {
+      regsub {\s} $name {} name
+   }
+   if {[lsearch $name $function_name] != -1 } {
+      for {set i 0} {$i < [llength $function_list} {incr i} {
+         if {[lsearch [lindex $function_list 0 ] $name] != -1} {
+            set fn_list_index $i
+	    break
+         } else {
+            error "Internal error"
+         }
+      }
+   } else {
+      error "Invalid fuction name"
+   }
+   set fn_ret_value [lindex [lindex $function_list $fn_list_index] 2]
+   if {$args == ""} {
+      set orig_ret_value void
+   } elseif {[lsearch $args $int_var] != -1} {
+      set orig_ret_value int
+   } elseif {[lsearch $args $char_var] != -1} {
+      set orig_ret_value str
+   } else {
+      #Error:Error in arg type
+      puts "$line_no1:!X+-\{\}"
+      error "Error in arg type"
+   }
+   if {$fn_ret_value neq $orig_ret_value} {
+   
+   } else {
+      #Error:Syntax error
+      puts "$line_no1:!X+-"
+      error "Syntax error"
+   }
 }
 
 ##For list statements
@@ -727,15 +797,18 @@ proc regexp_dev {line} {
       puts $opfile "[decrement $line]" 
    } elseif {[regexp {^\s*कर\s*} $line] == 1} {
       procedure $line
-   } else {
+   } elseif {[lsearch $line $fun] == 0} {
       function_call $line
-
-   } 
+   } else {
+      error "Unknown command"
+   }
 }
 
 # Main program
 proc main {file_name} {
-   global ipfile line_no opfile flower_brace
+   global ipfile line_no opfile flower_brace function_name int_var char_var
+   set int_var ""
+   set char_var ""
    set flower_brace {0}
    open_compilation_file $file_name
    while {[gets $ipfile line] >= 0} {
