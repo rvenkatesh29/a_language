@@ -86,16 +86,17 @@ proc save_as_file {} {
 	if {[winfo exists .t] == 0 } {
 		tk_messageBox -icon error -title "Text window not found" -type ok -message "Please open a new or existing file"
 		return
- 	} elseif {$file_name == ""} {
-		tk_messageBox -icon error -title "Text window not found" -type ok -message "Please open a new or existing file"
-		return
-	}
+ 	} 
 	set types {
 		{{A Language Files} {.a}}
 		{{All Files} *}
 	}
         regsub {\\program_files\\(.*)$} $::argv0 {\my_files} initial_dir1
-	set file_name [tk_getSaveFile -defaultextension a -file_types $types -initialdir $initial_dir1]
+	set types {
+		{{A Language Files} {.a}}
+		{{All Files} *}
+	}
+	set file_name [tk_getSaveFile -defaultextension a -filetypes $types -initialdir $initial_dir1]
 	if { $file_name != "" } {
 		set file1 [open $file_name w]
 		fconfigure $file1 -encoding utf-8
